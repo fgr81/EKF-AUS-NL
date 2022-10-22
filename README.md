@@ -1,3 +1,9 @@
+## DISCLAIMER
+
+This is a sperimental branch, it is not working.
+Pybind11 allow using EKF_AUS instances inside python scripts, as slam.py .
+
+
 ## Synopsis
 
 This library implements the EKF-AUS-NL ( Extended Kalman Filter with Assimilation confined in the Unstable Space) algorithm, presented by A. Trevisan and L. Palatella in
@@ -14,7 +20,14 @@ In this project we propose a variation of the algorithm EKF-AUS-NL designed to p
 
 ## Installation
 
-In the main package directory there is a Makefile, no other library/package in the host is required.
+Use ekf.yml to create the conda env 'ekf' and switch into.
+
+Then type:
+```
+cmake .
+make
+```
+
 This implementation of EKF-AUS-NL could be applied to several systems, described by proper dynamical equations. In ./external there are the implementations of two systems: L96 and SLAM; they can be used to test the filter. The main routine manages these two options on command line; the user has to indicate also a text file that include the initial condition, e.g. initial_SLAM.dat and initial_l96.dat.
 
 Compilation
