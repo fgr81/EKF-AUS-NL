@@ -36,8 +36,9 @@ Finally:
 ```
 python slam.py
 ```
-
-
+Output is stored in trajectory.dat in this form:
+```
+x_[position] y_[position] phi_[angle] linear_velocity steering_[angular velocity]
 
 
 
