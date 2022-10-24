@@ -20,7 +20,11 @@ In this project we propose a variation of the algorithm EKF-AUS-NL designed to p
 
 ## Installation
 
-Use ekf.yml to create the conda env 'ekf' and switch into.
+Using of Conda:
+```
+conda env create -f ekf.yml
+conda activate ekf
+```
 
 Then type:
 ```
