@@ -20,7 +20,7 @@ In this project we propose a variation of the algorithm EKF-AUS-NL designed to p
 
 ## Installation
 
-Using of Conda:
+Wanting to use Conda:
 ```
 conda env create -f ekf.yml
 conda activate ekf
@@ -31,6 +31,19 @@ Then type:
 cmake .
 make
 ```
+
+Finally:
+```
+python slam.py
+```
+Output is stored in trajectory.dat in this form:
+```
+x_[position] y_[position] phi_[angle] linear_velocity steering_[angular velocity]
+
+
+
+
+
 
 This implementation of EKF-AUS-NL could be applied to several systems, described by proper dynamical equations. In ./external there are the implementations of two systems: L96 and SLAM; they can be used to test the filter. The main routine manages these two options on command line; the user has to indicate also a text file that include the initial condition, e.g. initial_SLAM.dat and initial_l96.dat.
 
