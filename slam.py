@@ -235,7 +235,7 @@ class Slam:
         
 def main():
     BEGIN_STEP = 0
-    STOP_STEP = 45
+    STOP_STEP = 145
     N = 5
     M = 6  # LinM
     P = 0
