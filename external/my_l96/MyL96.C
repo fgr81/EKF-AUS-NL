@@ -2,8 +2,8 @@
 #include <iostream>
 #include <fstream>
 
-#include "../../Eigen/Dense"
-#include "../../Eigen/Eigenvalues"
+#include "Eigen/Dense"
+#include "Eigen/Eigenvalues"
 
 #define ppi 6.28318530717959
 #define pi  3.14159265358979
@@ -68,7 +68,7 @@ int main(int argc, char* argv[])
 
   in >> N0;
 
-  cout << "Dimensione sistema N0 = " << N0 << endl;
+  //  cout << "Dimensione sistema N0 = " << N0 << endl;
 
   sscanf(argv[2],"%lf",&tfin);
 

@@ -133,8 +133,8 @@ public:
    *@param error: the MatrixXd vector with the sigma of the model error variables
    *@param Xa: the  N0 x TotNumberPert() MatrixXd with the column vectors with the perturbations
    */
-  inline void SetModelErrorVariable(long istart, long iend, MatrixXd error, MatrixXd& Xa);
-  // fmg inline void SetModelErrorVariable(long istart, long iend, Eigen::Ref<MatrixXd> error, Eigen::Ref<MatrixXd>& Xa);
+  // inline void SetModelErrorVariable(long istart, long iend, MatrixXd error, MatrixXd& Xa);
+  inline void SetModelErrorVariable(long istart, long iend, Eigen::Ref<MatrixXd> error, Eigen::Ref<MatrixXd>& Xa);
 
   inline MatrixXd ComputeHEf(FP NonLinH, MatrixXd Ef, double LinearScale, MatrixXd& xf);
   // inline MatrixXd ComputeHEf2(const std::function<Eigen::Ref<Eigen::MatrixXd>(Eigen::Ref<Eigen::MatrixXd>)>& NonLinH, MatrixXd Ef, double LinearScale, const Eigen::Ref<Eigen::MatrixXd>& xf);
@@ -197,12 +197,8 @@ MatrixXd EKF_AUS::ComputeHEf2(const std::function<Eigen::VectorXd(Eigen::Ref<Eig
   for(long j=0; j<Ef.cols(); j++)
     {
       xfp.col(0) = xf.col(0) + LinearScale * Ef.col(j);
-      // cout << "KIKI xfp.col(0)" << xfp.col(0) << endl;
       h_xfp = NonLinH(xfp);
       h_xf  = NonLinH(xf);
-      // cout << endl << " Ef.col(j)" << endl << Ef.col(j) << endl;
-      // cout << endl << " h_xfp" << h_xfp <<  endl ;
-      // cout << endl << " h_xf" << h_xf <<  endl ;
       //hefcol = invLinearScale * ( NonLinH(xfp) - NonLinH(xf) ) ;
       hefcol = invLinearScale * ( h_xfp - h_xf ) ;
 
@@ -212,25 +208,21 @@ MatrixXd EKF_AUS::ComputeHEf2(const std::function<Eigen::VectorXd(Eigen::Ref<Eig
   return hef;
 }
 
-// void EKF_AUS::Assimilate2(Eigen::Ref<Eigen::MatrixXd>& measure, const std::function<int(int)> &NonLinH, Eigen::Ref<Eigen::MatrixXd>& R, Eigen::Ref<Eigen::MatrixXd>& xf, Eigen::Ref<Eigen::MatrixXd>& Xf)
-// void EKF_AUS::Assimilate2(Eigen::Ref<Eigen::MatrixXd>& measure, const std::function<Eigen::Ref<Eigen::MatrixXd>(Eigen::Ref<Eigen::MatrixXd>)> &NonLinH, Eigen::Ref<Eigen::MatrixXd>& R, Eigen::Ref<Eigen::MatrixXd>& xf, Eigen::Ref<Eigen::MatrixXd>& Xf)
 void EKF_AUS::Assimilate2(Eigen::Ref<Eigen::MatrixXd>& measure, const std::function<Eigen::VectorXd(Eigen::Ref<Eigen::MatrixXd>)> &NonLinH, Eigen::Ref<Eigen::MatrixXd>& R, Eigen::Ref<Eigen::MatrixXd>& xf, Eigen::Ref<Eigen::MatrixXd>& Xf)
 
 {
   // ofstream alog("log_ekf.txt"); // fmg 251219
-  // cout << "KIKI debug lunghezza measure: " << measure.rows() << endl;
-  MatrixXd anom, a2;
+  MatrixXd anom;
   VectorXd nlh;
   double check_anom;
-  
+  MatrixXd kk = NonLinH(xf);
   try{
-     MatrixXd kk = NonLinH(xf);
      anom = measure - NonLinH(xf) ;
-     cout << "KIKI dentro Assimilate2, ecco measure:" << endl << measure << endl;
-     cout << "KIKI dentro Assimilate2, ecco NonLinH(xf):" << endl << NonLinH(xf) << endl;
+     //cout << "KIKI dentro Assimilate2, ecco anom:" << endl << anom << endl;
+     /*cout << "KIKI dentro Assimilate2, ecco measure:" << endl << measure << endl;
      cout << "KIKI dentro Assimilate2, ecco xf: " << endl << xf << endl;
-     cout << "KIKI dentro Assimilate2, ecco anom:" << endl << anom << endl;
-     cout <<  "KIKI fine" << endl;    
+     cout << "KIKI dentro Assimilate2, ecco NonLinH(xf):" << endl << NonLinH(xf) << endl;
+     cout <<  "KIKI fine" << endl;    */
   }
   // catch (int ercode){
   catch ( std::exception &ercode){
@@ -345,9 +337,7 @@ void EKF_AUS::Assimilate2(Eigen::Ref<Eigen::MatrixXd>& measure, const std::funct
       }
 
   xf = xa;
-  //cout << "KIKI DENTRO, A FINE ASSMILATE2, ECCO LA MATRICE Xa:" << endl;
-  //cout << Xf << endl;
-  //cout << "KIKI ecco xf a fine assimilazione: " << endl << xf << endl;
+  
   //alog << "xf:\n";
   //alog << xf ;
   //alog << "\n" ;
@@ -535,6 +525,8 @@ inline MatrixXd EKF_AUS::PrepareForAnalysis(MatrixXd& xf, MatrixXd& Evoluted, Ma
   MatrixXd outXf(N(),  linM() + HalfNumberNonLinPert() );
   long k=0;
   double invfactor = 1. / lin_factor, fac = alphabar /2.;
+  //cout << "KIKI-1 141122 linM(): " << linM() << " HalfNumberNonLinPert(): " << HalfNumberNonLinPert() << endl;
+  //cout << "KIKI0 141122  dimensioni di outXf: " << outXf.cols() << endl;
 
   // cout << "invfact = " << invfactor << endl;
   for(long i=0; i<linM() + HalfNumberNonLinPert(); i++)
@@ -554,13 +546,13 @@ inline MatrixXd EKF_AUS::PrepareForAnalysis(MatrixXd& xf, MatrixXd& Evoluted, Ma
   for(long i=0; i< linM() + HalfNumberNonLinPert(); i++)
     for(long j=0; j<N(); j++)
       outXf(j,i) = outXf(j,i) / Gmunu(j,0);
-
+  //cout << "KIKI1 141122  dimensioni di outXf: " << outXf.cols() << endl;
   return outXf;
 }
 
 
-inline void EKF_AUS::SetModelErrorVariable(long istart, long iend, MatrixXd error, MatrixXd& Xa)
-// fmg inline void EKF_AUS::SetModelErrorVariable(long istart, long iend, Eigen::Ref<MatrixXd> error, Eigen::Ref<MatrixXd>& Xa)
+//inline void EKF_AUS::SetModelErrorVariable(long istart, long iend, MatrixXd error, MatrixXd& Xa)
+inline void EKF_AUS::SetModelErrorVariable(long istart, long iend, Eigen::Ref<MatrixXd> error, Eigen::Ref<MatrixXd>& Xa)
 {
   long nme = iend - istart + 1;
 

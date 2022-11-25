@@ -74,7 +74,8 @@ def evolve(XX, time):
 
 print("Script di test ekfaus.py con il modello Lorenz96")
 
-Assimilationcycles = 1000
+# Assimilationcycles = 1000
+Assimilationcycles = 2
 
 
 npert = 16
@@ -160,14 +161,9 @@ for kk in range(Assimilationcycles):
     for i in range(ekf_aus.P()):
         g = gaussiano()
         measure[i, 0] += sigmad * g 
-
     Xa = ekf_aus.PrepareForAnalysis(analysis, perturbazioni, gmunu)
-
-#    print(analysis)
-
     ekf_aus.Assimilate(measure, nonlinH, R, analysis, Xa)
 
-#    print(analysis)
 
     traj.write(f"{truth[0, 0]} {truth[1, 0]} {truth[2, 0]} {analysis[0, 0]} {analysis[1, 0]} {analysis[2, 0]}\n")
     print(f"Timestep = {kk} Forecast Error = {np.linalg.norm(errore) / math.sqrt(N0)}")
