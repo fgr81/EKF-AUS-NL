@@ -234,7 +234,7 @@ def main():
     N = 5
     M = 6  # LinM
     P = 0
-    ML = 0  # nonLinM
+    ML = 4  # nonLinM
     ekf = Ekf(N, M, P, ML)
     slam = Slam(ekf.nc)  # Inizializzo il sistema con i valori di default
     
