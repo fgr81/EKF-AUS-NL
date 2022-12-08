@@ -7,6 +7,7 @@ Created on Fri Jan  7 10:20:20 2022
 """
 
 from test_bed_maker import TestBed
+from kitti import Kitti
 from ekf_aus_utils import EkfAusUtils as Ekf
 import numpy as np
 import math 
@@ -226,7 +227,64 @@ class Slam:
                    lm.xa_x = xa[3 + 2*i, :]
                    lm.xa_y = xa[4 + 2*i, :]
                    break
+    
+    def iterazione(self, i, ekf, scan):
+        print(f"Nuovo step:{i}, self.car(x,y,phi,v,g): {self.car.x}, {self.car.y}, {self.car.phi}, {self.car.v}, {self.car.g}")
+        analysis, xa = self.give_xa_and_analysis( i -1 )
+        self.album_misure.append([])
+        self.album_stato.append([])
+        
+        _n = int(len(scan)/3)
+        for ii in range(_n):
+            _id = scan[ii*3]
+            self.album_stato[i].append(_id)
+            if _id in self.album_stato[i-1]:  # è in tracking
+                self.album_misure[i].append(_id)       
+            trovato = 0
+            for lm in self.lm:
+                if lm.idd == _id:                   
+                    trovato = 1
+                    lm.meas_x = scan[ii*3 + 1]
+                    lm.meas_y = scan[ii*3 + 2]
+                    break
+            if trovato == 0:
+                # Nuovo lm, viene aggiunto in self.lm
+                m = {'x': scan[ii*3 + 1], 'y':scan[ii*3 + 2]}
+                abs_x, abs_y = self.absoluting(m)
+                self.lm.append(self.Lm(idd=scan[ii*3], meas_x=scan[ii*3 +1], meas_y=scan[ii*3 +2], abs_x=abs_x, abs_y=abs_y, nc=self.nc))                
+        measure = self.give_measure(i)
+        print("Misura len:", str(len(measure)/2))
+        # todo kiki gestire measure==0
+        _analysis, _xa = ekf.worker(analysis, xa, measure, Slam.evolve, self.non_lin_h)        
+        self.update(_analysis, _xa)
+        
+        
+                
 
+def main2():
+    BEGIN_STEP = 0
+    STOP_STEP = 100
+    N = 5
+    M = 6  # LinM
+    P = 0
+    ML = 4  # nonLinM
+    ekf = Ekf(N, M, P, ML)
+    slam = Slam(ekf.nc)  # Inizializzo il sistema con i valori di default
+    traiettoria = open(Slam.FILENAME_TRAJECTORY, 'w')
+    
+    scan = TestBed.get_scan(BEGIN_STEP)
+    slam.initial_assimilation(scan) 
+    analysis, xa = slam.give_xa_and_analysis(0)
+    slam.write_output_state_to_file(BEGIN_STEP)
+        
+    for i in range(BEGIN_STEP + 1, STOP_STEP):
+        scan = TestBed.get_scan(i)
+        slam.iterazione(i, ekf, scan)
+        slam.write_output_state_to_file(i)
+        traiettoria.write(f"{slam.car.x} {slam.car.y} {slam.car.phi} {slam.car.v} {slam.car.g}\n")
+        traiettoria.flush()
+
+    traiettoria.close()
 
 def main():
     BEGIN_STEP = 0
@@ -310,6 +368,6 @@ def main():
         
 
 if __name__ == "__main__":
-    main()
+    main2()
     print("finito, pace e bene.")   
     
