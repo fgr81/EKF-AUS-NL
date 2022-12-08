@@ -252,6 +252,15 @@ def main():
         slam.album_misure.append([])
         slam.album_stato.append([])
         
+        ###
+        #
+        # 081222 festa dell'Immacolata, calcolo:
+        # ' il valor medio sui lm della differenza fra la posizione (x,y) 
+        # al tempo t e quella al tempo t-1'
+        #
+        ####
+        media_spost = {'x':0., 'y':0., 'cont':0}
+        
         scan = TestBed.get_scan(i)
         _n = int(len(scan)/3)
 
@@ -264,6 +273,13 @@ def main():
             trovato = 0
             for lm in slam.lm:
                 if lm.idd == _id:
+                    
+                    # 081222
+                    media_spost['cont'] += 1
+                    media_spost['x'] += abs(lm.meas_x - scan[ ii*3 + 1])
+                    media_spost['y'] += abs(lm.meas_y - scan[ ii*3 + 2])
+                    #
+                    
                     trovato = 1
                     lm.meas_x = scan[ii*3 + 1]
                     lm.meas_y = scan[ii*3 + 2]
@@ -276,6 +292,8 @@ def main():
                 
         measure = slam.give_measure(i)
         print("Misura len:", str(len(measure)/2))
+        #081222
+        print("Valor medio differenza misura, componente x:", media_spost['x']/media_spost['cont'], " componente y:", media_spost['y']/media_spost['cont'])
         # todo kiki gestire measure==0
         _analysis, _xa = ekf.worker(analysis, xa, measure, Slam.evolve, slam.non_lin_h)        
         slam.update(_analysis, _xa)

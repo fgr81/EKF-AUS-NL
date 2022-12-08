@@ -79,9 +79,9 @@ class EkfAusUtils:
         self.R = np.ones(len(measure), dtype=float, order='F') * EkfAusUtils.SIGMAD * EkfAusUtils.SIGMAD
         self.R[-1] = 0.1
         self.R.flags.writeable = True
-        self.stampa_coda_Xa(Xa,'prima')
+        #self.stampa_coda_Xa(Xa,'prima')
         self.ekf.SetModelErrorVariable(len(analysis)-2, len(analysis)-1, self.model_error, Xa)
-        self.stampa_coda_Xa(Xa,'dopo')
+        #self.stampa_coda_Xa(Xa,'dopo')
         self.ekf.N(len(analysis))
 
         perturbazioni = self.ekf.PrepareForEvolution(analysis, Xa, self.gmunu)
