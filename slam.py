@@ -262,6 +262,9 @@ class Slam:
                 
 
 def main2():
+    
+    fornitore = TestBed()
+    
     BEGIN_STEP = 0
     STOP_STEP = 100
     N = 5
@@ -272,13 +275,13 @@ def main2():
     slam = Slam(ekf.nc)  # Inizializzo il sistema con i valori di default
     traiettoria = open(Slam.FILENAME_TRAJECTORY, 'w')
     
-    scan = TestBed.get_scan(BEGIN_STEP)
+    scan = fornitore.get_scan(BEGIN_STEP)
     slam.initial_assimilation(scan) 
     analysis, xa = slam.give_xa_and_analysis(0)
     slam.write_output_state_to_file(BEGIN_STEP)
         
     for i in range(BEGIN_STEP + 1, STOP_STEP):
-        scan = TestBed.get_scan(i)
+        scan = fornitore.get_scan(i)
         slam.iterazione(i, ekf, scan)
         slam.write_output_state_to_file(i)
         traiettoria.write(f"{slam.car.x} {slam.car.y} {slam.car.phi} {slam.car.v} {slam.car.g}\n")

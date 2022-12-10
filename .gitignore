@@ -10,3 +10,13 @@ gnuplots/*png
 trajectory.dat
 utils/scans/*png
 utils/*mp4
+external*
+ekfaus.cpython-311-x86_64-linux-gnu.so
+ekfaus.cpython-39-x86_64-linux-gnu.so
+perfectL96.log
+plot.png
+test_absoluting_e_distanza_cartesiana.py
+tmp.png
+traiettorieL96.dat
+truthL96.dat
+

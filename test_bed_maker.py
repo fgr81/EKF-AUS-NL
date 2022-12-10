@@ -21,7 +21,9 @@ from numpy import ndarray
 
         
 class TestBed:
-    
+
+    def __init__(self):
+        print("Instanzio la classe TestBed")
     #####
     #
     #  
@@ -183,7 +185,7 @@ class TestBed:
         
         return dist
     
-       
+    @staticmethod   
     def get_scan(t):
         global DEBUG 
         log = DEBUG['log_lm_idd']
