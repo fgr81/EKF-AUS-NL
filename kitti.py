@@ -19,8 +19,8 @@ import time
 import os
 from PIL import Image
 import math
-#import Slam
-#from ekf_aus_utils import EkfAusUtils as Ekf
+from slam import Slam, Car
+from ekf_aus_utils import EkfAusUtils as Ekf
 
 
 
@@ -50,7 +50,7 @@ class OrbMark():
 
     def make_3d_point(self, parameter):
         # global parameters
-        q = parameter.q
+        q = parameter['q']
         x_l = self.left['x']
         y_l = self.left['y']
         x_r = self.right['x']
@@ -75,8 +75,12 @@ class OrbMark():
         # point['x'] = pos3D[0]
         # point['y'] = pos3D[1]
         # point['z'] = pos3D[2]
+        
+        #fmg 251222 inverto questi due segni
+        #point['x'] = pos3D[2]
+        #point['y'] = -pos3D[0]
         point['x'] = pos3D[2]
-        point['y'] = - pos3D[0]
+        point['y'] = -pos3D[0]
         return point
 
     @staticmethod
@@ -263,7 +267,6 @@ class OrbMark():
         return lms3
 
     def match(self, lms_f_prec, parameters):
-        # global parameters
         threshold_spazio = parameters['threshold_spazio']
         threshold_matcher = parameters['threshold_matcher']
         matcher = cv2.BFMatcher(cv2.NORM_HAMMING, crossCheck=True)
@@ -273,7 +276,6 @@ class OrbMark():
         query_desc = np.zeros((1, 32), dtype=np.uint8)
         query_desc[0] = self.l_desc
         matches = matcher.match(query_desc, desc_f_prec)
-        # print(f"FOUND {len(matches)} matches")
         if len(matches) > 0:
             sorted_matches = sorted(matches, key=lambda x: x.distance)
             pref = lms_f_prec[sorted_matches[0].trainIdx]
@@ -282,8 +284,7 @@ class OrbMark():
             # print(f"distanza spaziale:{dist}  --
             # distanza match:{sorted_matches[0].distance}")
             if dist < threshold_spazio and sorted_matches[0].distance < threshold_matcher:
-                # print(f"idd del landmark selezionato:
-                # {lms_f_prec[sorted_matches[0].trainIdx].id}")
+                # print(f"idd del landmark selezionato: {lms_f_prec[sorted_matches[0].trainIdx].idd}")
                 return lms_f_prec[sorted_matches[0].trainIdx]
         return None
 
@@ -317,6 +318,7 @@ class Kitti:
             'threshold_matcher': 30.0
             }
         self.lm_t_prec = []
+        self.gui_lm_track = []
         
         
     def disegna_gui(self):
@@ -334,7 +336,7 @@ class Kitti:
         window = sg.Window("Demo", layout)
         return window
     
-    def update_gui(self, index, window, gui_lm_track):
+    def update_gui(self, index, window):
         f = str(index).zfill(10) + '.png'
         img_00 = cv2.imread(self.sx_path + '/' + f, cv2.IMREAD_GRAYSCALE)
         img_01 = cv2.imread(self.dx_path + '/' + f, cv2.IMREAD_GRAYSCALE)
@@ -352,7 +354,7 @@ class Kitti:
         canvas[img_h:img_h * 2, img_w:img_w * 2] = img_11
         canvas = cv2.cvtColor(canvas, cv2.COLOR_GRAY2RGB)
         #for om in measure[index].track:
-        for om in gui_lm_track:
+        for om in self.gui_lm_track:
             cv2.line(canvas,
                       (int(om['om'].left['x']), int(om['om'].left['y'])),
                       (int(img_w + om['om'].right['x']), int(om['om'].right['y'])),
@@ -370,15 +372,16 @@ class Kitti:
         # Aggiorno l'interfaccia
         ###
         window["IMAGE"].update(filename='tmp.png')
-        # info = f"Lunghezza della misura:{len(measure[index].track)} Analysis: {analysis[0]} {analysis[1]} {analysis[2]} {analysis[-2]} {analysis[-1]}"
-        info = "Ciaooooo"
+        info = f"Lunghezza della misura:{len(self.gui_lm_track)}"
+        #info = "Ciaooooo"
         window["info"].update(info)
         window["frame_index"].update(f"frame index:{index}")\
     
     
     def get_scan(self, t):
         lm_t = OrbMark.do_orb(t, self.orb_parameters)
-        gui_lm_track = []
+        self.gui_lm_track = []
+        scan = []
         #####
         # Numero i lm e per farlo ho bisogno di conosce i lm del frame precedente
         #####
@@ -387,51 +390,91 @@ class Kitti:
             if len(self.lm_t_prec) > 0 or t > 0 :
                 _lm_match = lm.match(self.lm_t_prec, self.orb_parameters)
                 if _lm_match is not  None:
-                    lm.id = _lm_match.id
-                    gui_lm_track.append({
-                        'om': lm,
-                        'om_p': _lm_match
-                        })
+                    # Controllo che il match non sia un duplicato
+                    duplicato = 0
+                    for i in range(0, len(scan),3):
+                        if scan[i] == _lm_match.idd:
+                            duplicato = 1
+                            break
+                    if duplicato == 0:
+                        lm.idd = _lm_match.idd
+                        self.gui_lm_track.append({
+                            'om': lm,
+                            'om_p': _lm_match
+                            })
+                    else:
+                        altrimenti = 1
                 else:
                     altrimenti = 1
             else:
                 altrimenti = 1
-            if altrimenti:
+                
+            if altrimenti:                
                 self.last_idd += 1
-                lm.id = self.last_idd
-        
+                lm.idd = self.last_idd
+                #print('è nuovo, gli diamo questo idd', lm.idd)
+            ###
+            #
+            ###
+            _p = lm.make_3d_point(self.orb_parameters)
+            scan.append(lm.idd)            
+            scan.append(_p['x'])
+            scan.append(_p['y'])
+            #print("scan idd:", lm.idd, " x:", _p['x'], " y:", _p['y'])
         self.lm_t_prec = lm_t
-        return gui_lm_track
+
+        return scan 
                 
             
         
     
-
 def main():
+    
     START = 0
-    STOP = 2
+    STOP = 4500
+        
+    model_error = np.ones((2, 1), dtype=float, order='F')   # todo il numero '2' deve arrivare da fuori parametricamente
+    model_error.flags.writeable = True
+    model_error[0, 0] = 0.5 # 1.  # (m/s) error in the velocity
+    model_error[1, 0] = 45 * math.pi/180.  #       90 * math.pi/360.  # 3 degrees error for the steering angle
+    
+    ekf = Ekf(n=5, m=6, p=0, ml=4, model_error=model_error, SIGMA_R = 5., GMUNU_ESTIMATE = 1.)
+    car = Car(x = 0., y = 0., phi = 0., v = 10., g = 0.)
+    slam = Slam(ekf, car, SIGMA_ESTIMATE = 0.1, SIGMA_STEERING = 0.1)
     kitti = Kitti()
-    #ekf = Ekf(n=5, m=6, p=0, ml=4)
-    #slam = Slam(ekf)
+    
+    traiettoria = open(Slam.FILENAME_TRAJECTORY, 'w')
     window = kitti.disegna_gui()  # Disegna l'interfaccia
-    ###
-    #Ciclo vitale
-    ###
+        
+    def step(i):
+        scan = kitti.get_scan(i)        
+        slam.iterazione(i, scan)
+        slam.write_output_state_to_file(i)
+        traiettoria.write(f"{slam.car.x} {slam.car.y} {slam.car.phi} {slam.car.v} {slam.car.g}\n")
+        traiettoria.flush()
+        kitti.update_gui(actual_frame, window)
+        print(f"fine step {i} -- {slam.car.x} {slam.car.y} {slam.car.phi} {slam.car.v} {slam.car.g}\n")
+
+
+    # Assimilazione iniziale  ##############################    
+    scan = kitti.get_scan(START)                           #
+    slam.initial_assimilation(scan)                        #
+    analysis, xa = slam.give_xa_and_analysis(START)        #
+    slam.write_output_state_to_file(START)                 # 
+    ########################################################
+    
+    
     actual_frame = START
-    kitti.get_scan(actual_frame)
-    #slam.initial_assimilation(scan)
     while True:
         event, values = window.read()
         if event == "Avanti":
             actual_frame += 1
-            gui_lm_track = kitti.get_scan(actual_frame)
-            kitti.update_gui(actual_frame, window, gui_lm_track)
+            step(actual_frame)
         if event == "Auto":
-            while True and actual_frame < STOP:
+            while event != "Stop" and actual_frame < STOP:
                 actual_frame += 1
-                gui_lm_track = kitti.get_scan(actual_frame)
-                kitti.update_gui(actual_frame,window, gui_lm_track)
-                time.sleep(0.001)
+                step(actual_frame)                
+                time.sleep(0.0001)
                 event, values = window.read(timeout=1)
         if event == "Stop":
             break

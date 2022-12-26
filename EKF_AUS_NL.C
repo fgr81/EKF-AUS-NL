@@ -215,14 +215,13 @@ void EKF_AUS::Assimilate2(Eigen::Ref<Eigen::MatrixXd>& measure, const std::funct
   MatrixXd anom;
   VectorXd nlh;
   double check_anom;
-  MatrixXd kk = NonLinH(xf);
   try{
      anom = measure - NonLinH(xf) ;
-     //cout << "KIKI dentro Assimilate2, ecco anom:" << endl << anom << endl;
+     // cout << "KIKI dentro Assimilate2, ecco anom:" << endl << anom << endl;
      /*cout << "KIKI dentro Assimilate2, ecco measure:" << endl << measure << endl;
-     cout << "KIKI dentro Assimilate2, ecco xf: " << endl << xf << endl;
-     cout << "KIKI dentro Assimilate2, ecco NonLinH(xf):" << endl << NonLinH(xf) << endl;
-     cout <<  "KIKI fine" << endl;    */
+     cout << "KIKI dentro Assimilate2, ecco xf: " << endl << xf << endl;*/
+     /*cout << "KIKI dentro Assimilate2, ecco NonLinH(xf):" << endl << NonLinH(xf) << endl;
+     cout <<  "KIKI fine" << endl;   */ 
   }
   // catch (int ercode){
   catch ( std::exception &ercode){
