@@ -102,9 +102,10 @@ class Slam:
     def evolve(cols, timestep=0.1):
         DT = 0.025
         B = 2.71  # Viene dalla vettura di KITTI (dovrebbe essere la lunghezza)
-        # fmg 190722 nsteps = int(round(timestep / DT, 0))
-        nsteps = 1
-        DT = timestep
+        # fmg 190722 
+        nsteps = int(round(timestep / DT, 0))
+        #nsteps = 1
+        #DT = timestep
         n_cols = cols.shape[1]
         for i in range(n_cols):
             x = cols[0,i]
@@ -274,6 +275,13 @@ class Slam:
         
         media_spost = {'x':0., 'y':0., 'cont':0}
         
+        '''
+        landmark scansionati per la prima volta, in questa iterazione  non
+        partecipano all'assimilazione ma vengono conservati in memoria per la 
+        prox iterzione
+        '''
+        nuovi_lm = []  
+                       
         _n = int(len(scan)/3)
         for ii in range(_n):
             _id = scan[ii*3]
@@ -297,10 +305,10 @@ class Slam:
                     break
                 
             if trovato == 0:
-                # Nuovo lm, viene aggiunto in self.lm
-                m = {'x': scan[ii*3 + 1], 'y':scan[ii*3 + 2]}
-                abs_x, abs_y = self.absoluting(m)
-                self.lm.append(Lm(idd=scan[ii*3], meas_x=scan[ii*3 +1], meas_y=scan[ii*3 +2], abs_x=abs_x, abs_y=abs_y, slam=self))                
+                # Nuovo lm
+                nuovi_lm.append(scan[ii*3])
+                nuovi_lm.append(scan[ii*3 + 1])
+                nuovi_lm.append(scan[ii*3 + 2])
                 
         measure = self.give_measure(i)
         print("Misura len:", str(len(measure)/2))
@@ -308,6 +316,21 @@ class Slam:
         # todo kiki gestire measure==0
         _analysis, _xa = self.ekf.worker(analysis, xa, measure, Slam.evolve, self.non_lin_h)        
         self.update(_analysis, _xa)
+        
+        '''
+        Ora che è stata assimilata la nuova posizione dell'auto, assimilo i 
+        nuovi lm
+        '''
+        n_lm = int(len(nuovi_lm)/3)
+        for ii in range(n_lm):
+            m = {'x': nuovi_lm[ii*3 + 1], 'y':nuovi_lm[ii*3 + 2]}
+            abs_x, abs_y = self.absoluting(m)
+            self.lm.append(Lm(idd=nuovi_lm[ii*3], meas_x=nuovi_lm[ii*3 +1], meas_y=nuovi_lm[ii*3 +2], abs_x=abs_x, abs_y=abs_y, slam=self))                            
+
+        '''
+        Elimino dalla memoria i lm vecchi in modo che il tempo di esecuzione sia
+        pressochè costante
+        '''        
         self.alleggerisci_lms()
 
 
@@ -337,7 +360,7 @@ def main2():
     fornitore = TestBed()
     
     BEGIN_STEP = 0
-    STOP_STEP = 100
+    STOP_STEP = 200
     N = 5
     M = 6  # LinM
     P = 0
