@@ -312,16 +312,24 @@ class Slam:
                 
         measure = self.give_measure(i)
         print("Misura len:", str(len(measure)/2))
-        print("Valor medio differenza misura, componente x:", media_spost['x']/media_spost['cont'], " componente y:", media_spost['y']/media_spost['cont'])
-        # todo kiki gestire measure==0
-        _analysis, _xa = self.ekf.worker(analysis, xa, measure, Slam.evolve, self.non_lin_h)        
-        self.update(_analysis, _xa)
+        
+        '''
+        Nel caso in cui la misura sia nulla, bisogna passare allo step 
+        successivo senza fare l'assimilazione
+        '''
+        if len(measure) > 0:
+            print("Valor medio differenza misura, componente x:", media_spost['x']/media_spost['cont'], " componente y:", media_spost['y']/media_spost['cont'])
+            
+            _analysis, _xa = self.ekf.worker(analysis, xa, measure, Slam.evolve, self.non_lin_h)        
+            self.update(_analysis, _xa)
+        
         
         '''
         Ora che è stata assimilata la nuova posizione dell'auto, assimilo i 
         nuovi lm
         '''
         n_lm = int(len(nuovi_lm)/3)
+        print('nuovi lm:', n_lm)
         for ii in range(n_lm):
             m = {'x': nuovi_lm[ii*3 + 1], 'y':nuovi_lm[ii*3 + 2]}
             abs_x, abs_y = self.absoluting(m)

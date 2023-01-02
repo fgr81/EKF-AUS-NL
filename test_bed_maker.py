@@ -76,6 +76,16 @@ class TestBed:
                     {"l": 10, "steer": 40},
                     {"l": 10, "steer": 20},
                     {"l": 10, "steer": 20},
+                    {"l": 10, "steer": 0},
+                    {"l": 10, "steer": 0},
+                    {"l": 10, "steer": -20},
+                    {"l": 10, "steer": -20},
+                    {"l": 10, "steer": -40},
+                    {"l": 10, "steer": -40},
+                    {"l": 10, "steer": -60},
+                    {"l": 10, "steer": -60},
+                    {"l": 10, "steer": -80},
+                    {"l": 10, "steer": -80},
                     ]
         for segment in segments:
             print("NUOVO SEGMENTO")
@@ -244,7 +254,7 @@ class TestBed:
 def main():
     TestBed.fai_percorso()
     TestBed.posiziona_land_marks_2()
-    for i in range(100):
+    for i in range(200):
         print(i)
         TestBed.get_scan(i)
     
