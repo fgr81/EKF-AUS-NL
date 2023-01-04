@@ -368,7 +368,7 @@ def main2():
     fornitore = TestBed()
     
     BEGIN_STEP = 0
-    STOP_STEP = 200
+    STOP_STEP = 124
     N = 5
     M = 6  # LinM
     P = 0

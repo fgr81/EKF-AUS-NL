@@ -197,6 +197,7 @@ class TestBed:
     
     @staticmethod   
     def get_scan(t):
+        SIGMA_ESTIMATE = 0.1
         global DEBUG 
         log = DEBUG['log_lm_idd']
         if log == 1:
@@ -236,13 +237,13 @@ class TestBed:
             lm = {'idd':int(row[0]), 'x': float(row[1]), 'y': float(row[2])}
             _raggio = TestBed.raggio(p, lm)
             if _raggio < MAX_RAGGIO:
-                dum, ang_con_lm = TestBed.arc_tang_aggiustato(p, lm) # kiki
+                dum, ang_con_lm = TestBed.arc_tang_aggiustato(p, lm) 
                 if abs(angolo - ang_con_lm) < MAX_ANG:
                     # lo prendo ! 
                     distanza = TestBed.distanza_cartesiana(p,radians,lm)  
                     out.append(lm['idd'])
-                    out.append(distanza['x'])
-                    out.append(distanza['y'])
+                    out.append(distanza['x'] + np.random.normal(0, SIGMA_ESTIMATE, 1) )
+                    out.append(distanza['y'] + np.random.normal(0, SIGMA_ESTIMATE, 1) )
                     if log == 1:
                         ff.write(f"{lm['idd']} {lm['x']} {lm['y']}\n")
         file_lm.close()
@@ -254,14 +255,15 @@ class TestBed:
 def main():
     TestBed.fai_percorso()
     TestBed.posiziona_land_marks_2()
-    for i in range(200):
-        print(i)
-        TestBed.get_scan(i)
+    #for i in range(200):
+    #    print(i)
+    #    TestBed.get_scan(i)
     
     print("finito, pace e bene.")        
 
 DEBUG = {
-    'log_lm_idd':1}
+    'log_lm_idd':0
+    }
 
 if __name__ == "__main__":
     main()
