@@ -70,8 +70,8 @@ class EkfAusUtils:
         self.ekf.N(len(analysis))
 
         perturbazioni = self.ekf.PrepareForEvolution(analysis, Xa, self.gmunu)
-        perturbazioni = evolve(perturbazioni, 0.1)
-        analysis = evolve(analysis, 0.1)
+        perturbazioni = evolve(perturbazioni)
+        analysis = evolve(analysis)
         Xa = self.ekf.PrepareForAnalysis(analysis, perturbazioni, self.gmunu)  
         meas = measure
         self.ekf.Assimilate(meas, non_lin_h, self.R, analysis, Xa)

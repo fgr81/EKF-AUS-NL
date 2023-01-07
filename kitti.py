@@ -448,7 +448,7 @@ def main():
         
     def step(i):
         scan = kitti.get_scan(i)        
-        slam.iterazione(i, scan)
+        slam.iterazione(scan)
         slam.write_output_state_to_file(i)
         traiettoria.write(f"{slam.car.x} {slam.car.y} {slam.car.phi} {slam.car.v} {slam.car.g}\n")
         traiettoria.flush()
@@ -459,7 +459,7 @@ def main():
     # Assimilazione iniziale  ##############################    
     scan = kitti.get_scan(START)                           #
     slam.initial_assimilation(scan)                        #
-    analysis, xa = slam.give_xa_and_analysis(START)        #
+    analysis, xa = slam.give_xa_and_analysis()             #
     slam.write_output_state_to_file(START)                 # 
     ########################################################
     

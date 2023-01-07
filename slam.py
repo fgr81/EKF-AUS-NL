@@ -34,20 +34,11 @@ class Slam:
         self.g_xa = np.random.normal(0, SIGMA_STEERING, nc)
 
         self.lm = []
-        self.album_misure = []
-        self.album_stato = []
-        
+        self.tracking_lm_idd = []
+        self.state_lm_idd = []
+        self.state_lm_idd_prec = []
 
-            
-    # class Lm:
-    #     def __init__(self, idd, meas_x, meas_y, abs_x, abs_y, nc, SIGMA_ESTIMATE = 1.):
-    #         self.idd = idd
-    #         self.meas_x = meas_x
-    #         self.meas_y = meas_y
-    #         self.abs_x = abs_x
-    #         self.abs_y = abs_y
-    #         self.xa_x = np.random.normal(0, SIGMA_ESTIMATE, nc)
-    #         self.xa_y = np.random.normal(0, SIGMA_ESTIMATE, nc)                
+
 
     def write_output_state_to_file(self, step = 0):
         f_stato = open(f"{Slam.FILENAME_OUTPUT}_{step}.dat", 'w')        
@@ -88,15 +79,14 @@ class Slam:
         
 
     def initial_assimilation(self, measure,t=0):
-        self.album_misure.append([])
-        self.album_stato.append([])
         for i in range(0,len(measure),3):        
             _id = int(measure[i])
             m = {'x': measure[i+1], 'y':measure[i+2]}
             abs_x, abs_y = self.absoluting(m)  
             self.lm.append(Lm(_id,m['x'],m['y'],abs_x, abs_y, self))
-            self.album_misure[0].append(_id)
-            self.album_stato[0].append(_id)
+            self.tracking_lm_idd.append(_id)
+            self.state_lm_idd.append(_id)
+
 
         
     def evolve(cols, timestep=0.1):
@@ -168,10 +158,9 @@ class Slam:
         angolo = state_col[2]
         
         n = int((len(state_col) - 5 )/2)
-        t = len(self.album_misure) - 2  # 
         for i in range(n):
-            _id = self.album_stato[t][i]
-            if _id in self.album_misure[t+1]:  # 
+            _id = self.state_lm_idd_prec[i]
+            if _id in self.tracking_lm_idd:  
                 lm = {'x': state_col[3 + i*2], 'y':state_col[4 + i*2]}
                 dist = self.distanza_cartesiana(pto,angolo,lm)  # 'x','y'
                 _out_mis.append(dist['x'])
@@ -182,9 +171,10 @@ class Slam:
             out_mis[idx] = x
         return out_mis
     
-    def give_measure(self, t):
+    
+    def give_measure(self):
         _out = []
-        for _idd in self.album_misure[t]:
+        for _idd in self.tracking_lm_idd:
             # Cerco in self.lm il corrispondente
             for lm in self.lm:
                 if lm.idd == _idd:
@@ -197,8 +187,8 @@ class Slam:
             meas[idx] = x
         return meas
 
-    def give_xa_and_analysis(self, t):
-        numero_di_landmark_misurati = len(self.album_stato[t]) 
+    def give_xa_and_analysis(self):
+        numero_di_landmark_misurati = len(self.state_lm_idd) 
         xa = np.ones( [numero_di_landmark_misurati*2 + 5, self.ekf.nc], dtype=float, order='F') 
         xa.flags.writeable = True
         analysis = np.ones( [numero_di_landmark_misurati*2 + 5,1], dtype=float, order='F')
@@ -219,7 +209,7 @@ class Slam:
         analysis[-2] = self.car.v
         analysis[-1] = self.car.g
         for i in range(0,numero_di_landmark_misurati):
-            _id = self.album_stato[t][i]
+            _id = self.state_lm_idd[i]
             for lm in self.lm:
                 if lm.idd == _id:
                     xa[3 + i*2] = lm.xa_x
@@ -240,9 +230,8 @@ class Slam:
         self.phi_xa = xa[2,:]
         self.v_xa = xa[len(analysis) - 2,:]
         self.g_xa = xa[len(analysis) - 1,:]
-        t = len(self.album_stato) - 2
-        for i in range(len(self.album_stato[t])):
-           _id = self.album_stato[t][i]          
+        for i in range(len(self.state_lm_idd_prec)):
+           _id = self.state_lm_idd_prec[i]          
            for  lm in self.lm:
                if lm.idd == _id:
                    lm.x = analysis[3 + 2*i][0]
@@ -252,27 +241,29 @@ class Slam:
                    break
     
     def alleggerisci_lms(self):        
-        if len(self.album_stato) < 3 :
-            return -1        
-        last_idx = len(self.album_stato) -1 
-        _cache = []
-        for i in self.album_stato[last_idx]:
-            _cache.append(i)
-        for i in self.album_stato[last_idx - 1]:
-            _cache.append(i)
         for lm in self.lm:
-            if lm.idd in _cache:
+            if ( lm.idd in self.state_lm_idd) or ( lm.idd in self.state_lm_idd_prec):
                 pass
             else:
                 self.lm.remove(lm)
-        
                 
-    def iterazione(self, i, scan):
-        print(f"Nuovo step:{i}, self.car(x,y,phi,v,g): {self.car.x}, {self.car.y}, {self.car.phi}, {self.car.v}, {self.car.g}")
-        analysis, xa = self.give_xa_and_analysis( i -1 )
-        self.album_misure.append([])
-        self.album_stato.append([])
-        
+    def iterazione(self, scan):
+        '''
+    
+        Parameters
+        ----------
+        i : TYPE
+            DESCRIPTION.
+        scan : array nella forma:
+            [ idd | posizione_x_relativa | posizione_y_relativa | idd ...ecc..ecc
+
+        Returns
+        -------
+        None. Agisce su self
+
+        '''
+        analysis, xa = self.give_xa_and_analysis()
+    
         media_spost = {'x':0., 'y':0., 'cont':0}
         
         '''
@@ -283,11 +274,16 @@ class Slam:
         nuovi_lm = []  
                        
         _n = int(len(scan)/3)
+
+        self.state_lm_idd_prec = self.state_lm_idd  # copio l'array
+        self.state_lm_idd = []
+        self.tracking_lm_idd = []
+        
         for ii in range(_n):
             _id = scan[ii*3]
-            self.album_stato[i].append(_id)
-            if _id in self.album_stato[i-1]:  # è in tracking
-                self.album_misure[i].append(_id)       
+            self.state_lm_idd.append(_id)
+            if _id in self.state_lm_idd_prec:  # è in tracking
+                self.tracking_lm_idd.append(_id)       
             trovato = 0
             for lm in self.lm:
                 
@@ -310,7 +306,7 @@ class Slam:
                 nuovi_lm.append(scan[ii*3 + 1])
                 nuovi_lm.append(scan[ii*3 + 2])
                 
-        measure = self.give_measure(i)
+        measure = self.give_measure()
         print("Misura len:", str(len(measure)/2))
         
         '''
@@ -319,7 +315,6 @@ class Slam:
         '''
         if len(measure) > 0:
             print("Valor medio differenza misura, componente x:", media_spost['x']/media_spost['cont'], " componente y:", media_spost['y']/media_spost['cont'])
-            
             _analysis, _xa = self.ekf.worker(analysis, xa, measure, Slam.evolve, self.non_lin_h)        
             self.update(_analysis, _xa)
         
@@ -329,7 +324,6 @@ class Slam:
         nuovi lm
         '''
         n_lm = int(len(nuovi_lm)/3)
-        print('nuovi lm:', n_lm)
         for ii in range(n_lm):
             m = {'x': nuovi_lm[ii*3 + 1], 'y':nuovi_lm[ii*3 + 2]}
             abs_x, abs_y = self.absoluting(m)
@@ -363,7 +357,7 @@ class Lm():
         
                 
 
-def main2():
+def main():
     
     fornitore = TestBed()
     
@@ -384,104 +378,22 @@ def main2():
     
     scan = fornitore.get_scan(BEGIN_STEP)
     slam.initial_assimilation(scan) 
-    analysis, xa = slam.give_xa_and_analysis(0)
+    #analysis, xa = slam.give_xa_and_analysis(0)
+    analysis, xa = slam.give_xa_and_analysis()
     slam.write_output_state_to_file(BEGIN_STEP)
         
     for i in range(BEGIN_STEP + 1, STOP_STEP):
+        print('Step #', i)
         scan = fornitore.get_scan(i)
-        slam.iterazione(i, scan)
+        slam.iterazione(scan)
         slam.write_output_state_to_file(i)
         traiettoria.write(f"{slam.car.x} {slam.car.y} {slam.car.phi} {slam.car.v} {slam.car.g}\n")
         traiettoria.flush()
 
     traiettoria.close()
 
-def main():
-    BEGIN_STEP = 0
-    STOP_STEP = 100
-    N = 5
-    M = 6  # LinM
-    P = 0
-    ML = 4  # nonLinM
-    model_error = np.ones((2, 1), dtype=float, order='F')   # todo il numero '2' deve arrivare da fuori parametricamente
-    #model_error.flags.writeable = True
-    model_error[0, 0] = 1. # 1.  # (m/s) error in the velocity
-    model_error[1, 0] = 10 * math.pi/180.  #       90 * math.pi/360.  # 3 degrees error for the steering angle
-    ekf = Ekf(N, M, P, ML, model_error)
-    slam = Slam(ekf.nc)  # Inizializzo il sistema con i valori di default
-    
-    traiettoria = open(Slam.FILENAME_TRAJECTORY, 'w')
-    
-    scan = TestBed.get_scan(BEGIN_STEP)
-    slam.initial_assimilation(scan) 
-    analysis, xa = slam.give_xa_and_analysis(0)
-    slam.write_output_state_to_file(BEGIN_STEP)
-        
-    for i in range(BEGIN_STEP + 1, STOP_STEP):
-
-        print(f"Nuovo step:{i}, slam.car(x,y,phi,v,g): {slam.car.x}, {slam.car.y}, {slam.car.phi}, {slam.car.v}, {slam.car.g}")
-        
-        slam.album_misure.append([])
-        slam.album_stato.append([])
-        
-        ###
-        #
-        # 081222 festa dell'Immacolata, calcolo:
-        # ' il valor medio sui lm della differenza fra la posizione (x,y) 
-        # al tempo t e quella al tempo t-1'
-        #
-        ####
-        media_spost = {'x':0., 'y':0., 'cont':0}
-        
-        scan = TestBed.get_scan(i)
-        _n = int(len(scan)/3)
-
-        for ii in range(_n):
-            _id = scan[ii*3]
-            slam.album_stato[i].append(_id)
-            if _id in slam.album_stato[i-1]:  # è in tracking
-                slam.album_misure[i].append(_id)
-
-            trovato = 0
-            for lm in slam.lm:
-                if lm.idd == _id:
-                    
-                    # 081222
-                    media_spost['cont'] += 1
-                    media_spost['x'] += abs(lm.meas_x - scan[ ii*3 + 1])
-                    media_spost['y'] += abs(lm.meas_y - scan[ ii*3 + 2])
-                    #
-                    
-                    trovato = 1
-                    lm.meas_x = scan[ii*3 + 1]
-                    lm.meas_y = scan[ii*3 + 2]
-                    break
-            if trovato == 0:
-                # Nuovo lm, viene aggiunto in self.lm
-                m = {'x': scan[ii*3 + 1], 'y':scan[ii*3 + 2]}
-                abs_x, abs_y = slam.absoluting(m)
-                slam.lm.append(slam.Lm(idd=scan[ii*3], meas_x=scan[ii*3 +1], meas_y=scan[ii*3 +2], abs_x=abs_x, abs_y=abs_y, nc=slam.nc))
-                
-        measure = slam.give_measure(i)
-        print("Misura len:", str(len(measure)/2))
-        #081222
-        print("Valor medio differenza misura, componente x:", media_spost['x']/media_spost['cont'], " componente y:", media_spost['y']/media_spost['cont'])
-        # todo kiki gestire measure==0
-        _analysis, _xa = ekf.worker(analysis, xa, measure, Slam.evolve, slam.non_lin_h)        
-        slam.update(_analysis, _xa)
-        analysis, xa = slam.give_xa_and_analysis(i)
-
-        slam.write_output_state_to_file(i)
-        traiettoria.write(f"{slam.car.x} {slam.car.y} {slam.car.phi} {slam.car.v} {slam.car.g}\n")
-        traiettoria.flush()
-
-    traiettoria.close()
-
-
-    
-        
 
 if __name__ == "__main__":
-    main2()
+    main()
     print("finito, pace e bene.")   
     
