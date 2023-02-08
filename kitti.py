@@ -353,13 +353,28 @@ class Kitti:
         img_11 = cv2.imread("plot.png", cv2.IMREAD_GRAYSCALE)
         canvas[img_h:img_h * 2, img_w:img_w * 2] = img_11
         canvas = cv2.cvtColor(canvas, cv2.COLOR_GRAY2RGB)
-        #for om in measure[index].track:
+        d_idx = 0
         for om in self.gui_lm_track:
             cv2.line(canvas,
                       (int(om['om'].left['x']), int(om['om'].left['y'])),
                       (int(img_w + om['om'].right['x']), int(om['om'].right['y'])),
                       (0, 255, 0),
                       1)
+            if d_idx < 1:                
+                d_idx += 1
+                d_text = f"{om['distanza_x']}, {om['distanza_y']}"
+                font = cv2.FONT_HERSHEY_SIMPLEX
+                org_c = ( int(om['om_p'].left['x']), img_h + int(om['om_p'].left['y']))
+                org =   ( int(om['om_p'].left['x']) + 5, img_h + int(om['om_p'].left['y']))
+                fontScale = 1.7
+                color = (255, 0, 0 )
+                thickness = 2
+                cv2.putText(canvas, d_text, org, font, 
+                                    fontScale, color, thickness, cv2.LINE_AA)   
+                radius = 4
+                thickness = 5
+                cv2.circle(canvas, org, radius, color, thickness)
+                
             cv2.line(canvas,
                       (int(om['om'].left['x']), int(om['om'].left['y'])),
                       (int(om['om_p'].left['x']), img_h + int(om['om_p'].left['y'])),
@@ -386,7 +401,11 @@ class Kitti:
         # Numero i lm e per farlo ho bisogno di conosce i lm del frame precedente
         #####
         for lm in lm_t:
-            altrimenti = 0
+            ###
+            # Qui si decide lm.idd
+            ###
+            _p = lm.make_3d_point(self.orb_parameters)
+            nuovo = 0
             if len(self.lm_t_prec) > 0 or t > 0 :
                 _lm_match = lm.match(self.lm_t_prec, self.orb_parameters)
                 if _lm_match is not  None:
@@ -398,25 +417,29 @@ class Kitti:
                             break
                     if duplicato == 0:
                         lm.idd = _lm_match.idd
+                        # Per la gui:                        
                         self.gui_lm_track.append({
                             'om': lm,
-                            'om_p': _lm_match
+                            'om_p': _lm_match,
+                            'distanza_x': _p['x'],
+                            'distanza_y': _p['y'],
                             })
                     else:
-                        altrimenti = 1
+                        nuovo = 1
                 else:
-                    altrimenti = 1
+                    nuovo = 1
             else:
-                altrimenti = 1
+                nuovo = 1
                 
-            if altrimenti:                
+            if nuovo:                                
                 self.last_idd += 1
                 lm.idd = self.last_idd
                 #print('è nuovo, gli diamo questo idd', lm.idd)
             ###
-            #
+            # fine 
             ###
-            _p = lm.make_3d_point(self.orb_parameters)
+            
+            # Faccio il vettore cosi come richiesto da slam.py            
             scan.append(lm.idd)            
             scan.append(_p['x'])
             scan.append(_p['y'])
@@ -447,7 +470,7 @@ def main():
     window = kitti.disegna_gui()  # Disegna l'interfaccia
         
     def step(i):
-        scan = kitti.get_scan(i)        
+        scan = kitti.get_scan(i)
         slam.iterazione(scan)
         slam.write_output_state_to_file(i)
         traiettoria.write(f"{slam.car.x} {slam.car.y} {slam.car.phi} {slam.car.v} {slam.car.g}\n")
