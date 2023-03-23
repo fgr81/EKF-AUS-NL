@@ -36,7 +36,7 @@ class Slam:
         self.lm = []
         self.tracking_lm_idd = []
         self.state_lm_idd = []
-        self.state_lm_idd_prec = []
+        self.state_lm_idd_prec = []  # Usato in non_lin_h per identificare nel vettore di stato  xf i lm
 
 
 
@@ -58,7 +58,7 @@ class Slam:
         for i in self.g_xa:
             f_stato.write(f"{i} ")
         for lm in self.lm:
-            f_stato.write(f"\n{lm.idd} {lm.abs_x} {lm.abs_y} ")
+            f_stato.write(f"\n{lm.idd} {lm.meas_x} {lm.meas_y} {lm.abs_x} {lm.abs_y} ")
             for tt in lm.xa_x:                
                 f_stato.write(f"{tt} ")
             for tt in lm.xa_y:    
@@ -78,10 +78,19 @@ class Slam:
         return abs_x, abs_y
         
 
-    def initial_assimilation(self, measure,t=0):
+    def initial_assimilation(self, _measure,t=0):
+        # todo kiki 
+        measure, filtered = self.outlier_filter(_measure)
         for i in range(0,len(measure),3):        
             _id = int(measure[i])
             m = {'x': measure[i+1], 'y':measure[i+2]}
+            abs_x, abs_y = self.absoluting(m)  
+            self.lm.append(Lm(_id,m['x'],m['y'],abs_x, abs_y, self))
+            self.tracking_lm_idd.append(_id)
+            self.state_lm_idd.append(_id)
+        for i in range(0,len(filtered),3):        
+            _id = int(filtered[i])
+            m = {'x': filtered[i+1], 'y':filtered[i+2]}
             abs_x, abs_y = self.absoluting(m)  
             self.lm.append(Lm(_id,m['x'],m['y'],abs_x, abs_y, self))
             self.tracking_lm_idd.append(_id)
@@ -156,15 +165,17 @@ class Slam:
         _out_mis = []
         pto = {'x': state_col[0], 'y': state_col[1]}
         angolo = state_col[2]
-        
+        #print('---NONLINH ----')
         n = int((len(state_col) - 5 )/2)
-        for i in range(n):
-            _id = self.state_lm_idd_prec[i]
-            if _id in self.tracking_lm_idd:  
-                lm = {'x': state_col[3 + i*2], 'y':state_col[4 + i*2]}
-                dist = self.distanza_cartesiana(pto,angolo,lm)  # 'x','y'
-                _out_mis.append(dist['x'])
-                _out_mis.append(dist['y'])
+        for _idd in self.tracking_lm_idd:
+            for i in range(n):
+                _id = self.state_lm_idd_prec[i]
+                if _id == _idd:
+                    #print(_id)
+                    lm = {'x': state_col[3 + i*2], 'y':state_col[4 + i*2]}
+                    dist = self.distanza_cartesiana(pto,angolo,lm)  # 'x','y'
+                    _out_mis.append(dist['x'])
+                    _out_mis.append(dist['y'])
         out_mis = np.zeros((len(_out_mis)), dtype=float, order='F')
         out_mis.flags.writeable = True
         for idx,x in enumerate(_out_mis):
@@ -173,11 +184,13 @@ class Slam:
     
     
     def give_measure(self):
+        #print('--- inizio give_measure---, ho da cercare ', str(len(self.tracking_lm_idd)))
         _out = []
         for _idd in self.tracking_lm_idd:
             # Cerco in self.lm il corrispondente
             for lm in self.lm:
-                if lm.idd == _idd:
+                if lm.idd == _idd:                    
+                    #print(_idd)
                     _out.append(lm.meas_x)
                     _out.append(lm.meas_y)
                     break
@@ -209,9 +222,9 @@ class Slam:
         analysis[-2] = self.car.v
         analysis[-1] = self.car.g
         for i in range(0,numero_di_landmark_misurati):
-            _id = self.state_lm_idd[i]
+            _id = self.state_lm_idd[i]            
             for lm in self.lm:
-                if lm.idd == _id:
+                if lm.idd == _id:                    
                     xa[3 + i*2] = lm.xa_x
                     xa[4 + i*2] = lm.xa_y
                     analysis[3 + i*2] = lm.abs_x
@@ -246,8 +259,78 @@ class Slam:
                 pass
             else:
                 self.lm.remove(lm)
-                
-    def iterazione(self, scan):
+    
+    def outlier_filter(self, scan):
+        out = []
+        filtered = []
+        #####
+        #
+        # Filtro outlier
+        #
+        #####
+        spost_x = []
+        spost_y = []
+        bound_x = 0.
+        bound_y = 0.
+        _n = int( len(scan)/3)
+        for ii in range(_n):
+            _id = scan[ii*3]
+            for lm in self.lm:
+                if lm.idd == _id:     
+                    spost_x.append(abs(lm.meas_x - scan[ ii*3 + 1]))                    
+                    spost_y.append(abs(lm.meas_y - scan[ ii*3 + 2]))                                        
+                    break
+        # Filtro gli outlier
+        coeff = 1.5  # default 1.5
+        if len(spost_x) > 6:
+            spost_x = sorted(spost_x)
+            spost_y = sorted(spost_y)
+            q1_x, q3_x = np.percentile(spost_x, [25, 75])                
+            q1_y, q3_y = np.percentile(spost_y, [25, 75])
+            iqr_x = q3_x - q1_x
+            iqr_y = q3_y - q1_y
+            bound_x = q3_x + (coeff * iqr_x)
+            bound_y = q3_y + (coeff * iqr_y)            
+            ##
+            # Determino gli outlier, marchiandone l'idd a -1
+            ##
+            for ii in range(_n):
+                _id = scan[ii*3]                
+                trovato = 0
+                for lm in self.lm:                    
+                    if lm.idd == _id:
+                        #Check soglie
+                        spostamento_x = abs(lm.meas_x - scan[ ii*3 + 1])
+                        spostamento_y = abs(lm.meas_y - scan[ ii*3 + 2])
+                        if spostamento_x > bound_x or spostamento_y > bound_y :
+                            # E' un outlier
+                            #print(f"*RIlevato oulier: {spostamento_x}, {spostamento_y}, le soglie sono x[{bound_x}] y[{bound_y}]")                            
+                            filtered.append(scan[ii*3])
+                            filtered.append(scan[ii*3 + 1])
+                            filtered.append(scan[ii*3 + 2])
+                        else:
+                            #print('* Non è outlier!')
+                            out.append(scan[ii*3])
+                            out.append(scan[ii*3 + 1])
+                            out.append(scan[ii*3 + 2])
+                        
+                        trovato = 1 
+                        break
+                    
+                if trovato == 0:
+                    out.append(scan[ii*3])
+                    out.append(scan[ii*3 + 1])
+                    out.append(scan[ii*3 + 2])
+        else:
+            for i in scan:
+                out.append(i)
+        return out, filtered
+                    
+        
+    def iterazione(self, _scan):
+        # non funziona 
+        scan, filtered = self.outlier_filter(_scan)
+        print(f"kiki len(no_filtered_scan):{len(_scan)/3} len(scan):{len(scan)/3} len(filtered):{len(filtered)/3}")
         '''
     
         Parameters
@@ -276,30 +359,30 @@ class Slam:
         _n = int(len(scan)/3)
 
         self.state_lm_idd_prec = self.state_lm_idd  # copio l'array
-        self.state_lm_idd = []
-        self.tracking_lm_idd = []
+        self.state_lm_idd = []                      # prenderà la forma degli idd misurati in scan
+        self.tracking_lm_idd = []                   # idd dei lm che saranno usati per fare il vettore measure
         
+         
         for ii in range(_n):
             _id = scan[ii*3]
+
             self.state_lm_idd.append(_id)
             if _id in self.state_lm_idd_prec:  # è in tracking
                 self.tracking_lm_idd.append(_id)       
             trovato = 0
-            for lm in self.lm:
-                
-                if lm.idd == _id:                   
-
-                    trovato = 1
-
+            for lm in self.lm:                
+                if lm.idd == _id:                                      
+                    '''
+                      debug
+                    '''
                     media_spost['cont'] += 1
                     media_spost['x'] += abs(lm.meas_x - scan[ ii*3 + 1])
                     media_spost['y'] += abs(lm.meas_y - scan[ ii*3 + 2])
-
+                    '''  '''
                     lm.meas_x = scan[ii*3 + 1]
                     lm.meas_y = scan[ii*3 + 2]
-
-                    break
-                
+                    trovato = 1
+                    break                
             if trovato == 0:
                 # Nuovo lm
                 nuovi_lm.append(scan[ii*3])
@@ -307,8 +390,8 @@ class Slam:
                 nuovi_lm.append(scan[ii*3 + 2])
                 
         measure = self.give_measure()
-        print("Misura len:", str(len(measure)/2))
-        
+        print("Misura len (self.tracking_lm_idd):", str(len(measure)/2))
+         
         '''
         Nel caso in cui la misura sia nulla, bisogna passare allo step 
         successivo senza fare l'assimilazione
@@ -324,10 +407,19 @@ class Slam:
         nuovi lm
         '''
         n_lm = int(len(nuovi_lm)/3)
+        print(f"kiki dentro iterazione, nuovi_lm:{n_lm}")
         for ii in range(n_lm):
             m = {'x': nuovi_lm[ii*3 + 1], 'y':nuovi_lm[ii*3 + 2]}
             abs_x, abs_y = self.absoluting(m)
             self.lm.append(Lm(idd=nuovi_lm[ii*3], meas_x=nuovi_lm[ii*3 +1], meas_y=nuovi_lm[ii*3 +2], abs_x=abs_x, abs_y=abs_y, slam=self))                            
+        
+        ''' 120323  '''
+        f_lm = int(len(filtered)/3)
+        for ii in range(f_lm):
+            m = {'x': filtered[ii*3 + 1], 'y':filtered[ii*3 + 2]}
+            abs_x, abs_y = self.absoluting(m)
+            self.lm.append(Lm(idd=filtered[ii*3], meas_x=filtered[ii*3 +1], meas_y=filtered[ii*3 +2], abs_x=abs_x, abs_y=abs_y, slam=self))                            
+
 
         '''
         Elimino dalla memoria i lm vecchi in modo che il tempo di esecuzione sia
@@ -378,7 +470,6 @@ def main():
     
     scan = fornitore.get_scan(BEGIN_STEP)
     slam.initial_assimilation(scan) 
-    #analysis, xa = slam.give_xa_and_analysis(0)
     analysis, xa = slam.give_xa_and_analysis()
     slam.write_output_state_to_file(BEGIN_STEP)
         

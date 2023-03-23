@@ -28,6 +28,7 @@
 
 #include <iostream>
 #include <fstream>
+#include <string>  // fmg 170223 per scrivere su file l'anomalia
 #include "Eigen/Dense"
 #include "Eigen/Eigenvalues"
 
@@ -212,14 +213,45 @@ void EKF_AUS::Assimilate2(Eigen::Ref<Eigen::MatrixXd>& measure, const std::funct
 
 {
   // ofstream alog("log_ekf.txt"); // fmg 251219
+  static int contatore = 0;
+  int _contatore;
   MatrixXd anom;
   VectorXd nlh;
   double check_anom;
   try{
+     MatrixXd nn = NonLinH(xf);
      anom = measure - NonLinH(xf) ;
+     /*
+       * fmg 170223 Scrivo anom su file per scopi di debug
+       *
+     */
+    
+    /*ifstream input_file("start");
+    if (!input_file.is_open()) {
+    }
+    while (input_file >> _contatore) {
+    }
+    input_file.close();
+    if (_contatore > contatore){
+	    contatore = _contatore + 2;
+    }*/
+    ofstream myfile ("anomalia_" + std::to_string(contatore) + ".txt");
+     if (myfile.is_open())
+     {
+       for(int count = 0; count < anom.rows(); count ++){
+         myfile <<  nn(count) << " " << anom(count) << endl ;
+       }
+       myfile.close();
+     }
+     contatore += 1;
+     
+     // fine // 
+     
      // cout << "KIKI dentro Assimilate2, ecco anom:" << endl << anom << endl;
-     /*cout << "KIKI dentro Assimilate2, ecco measure:" << endl << measure << endl;
-     cout << "KIKI dentro Assimilate2, ecco xf: " << endl << xf << endl;*/
+     /*
+     cout << "KIKI dentro Assimilate2, ecco measure:" << endl << measure << endl;
+     cout << "KIKI dentro Assimilate2, ecco xf: " << endl << xf << endl;
+     */
      /*cout << "KIKI dentro Assimilate2, ecco NonLinH(xf):" << endl << NonLinH(xf) << endl;
      cout <<  "KIKI fine" << endl;   */ 
   }

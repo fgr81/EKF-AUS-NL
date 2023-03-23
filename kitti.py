@@ -19,7 +19,7 @@ import time
 import os
 from PIL import Image
 import math
-from slam import Slam, Car
+from slam import Slam, Car, Lm
 from ekf_aus_utils import EkfAusUtils as Ekf
 
 
@@ -34,7 +34,6 @@ class OrbMark():
                  r_y=0,
                  r_desc=0,
                  t=-1,
-                 idd=-1
                  ):
         self.left = {'x': l_x, 'y': l_y}
         self.right = {'x': r_x, 'y': r_y}
@@ -43,11 +42,7 @@ class OrbMark():
         self.delta_x = l_x - r_x
         self.cluster_id = -1
         self.t = t
-        #self.id = OrbMark.last_id + 1
-        self.idd = idd
-        # print(f"- OrbMark.__init__self.id:{self.id}")
-        #OrbMark.last_id += 1        
-
+        
     def make_3d_point(self, parameter):
         # global parameters
         q = parameter['q']
@@ -56,17 +51,16 @@ class OrbMark():
         x_r = self.right['x']
         y_r = self.right['y']
         disparity = math.sqrt(((x_l - x_r)**2) + ((y_l - y_r)**2))
+        #print('KIKI disparity: ', disparity)
+        if disparity < 1:
+            print(f"KIKI attenzione !! disparity < 1 !!! x_l:{x_l} x_r:{x_r} y_l:{y_l} y_r:{y_r}")
+            #raise ValueError('disparity < 1.')
+            return None
         p = np.array([[x_l], [y_r], [disparity], [1.0]])
         pos3D_ = np.dot(q, p)
-        if disparity == 0.:
-            raise ValueError('diparity null')
-            '''
-            p =
-            array([[598.39135742],
-       [161.24317932],
-       [  0.        ],
-       [  1.        ]])
-            '''
+        #print('KIKI pos3d_: ', pos3D_[0][0], ' ' ,pos3D_[1][0], ' ' ,pos3D_[2][0], ' ' ,pos3D_[3][0])
+        #if disparity == 0.:
+            #raise ValueError('diparity null')                  
         pos3D = np.array([pos3D_[0][0]/pos3D_[3][0],
                           pos3D_[1][0]/pos3D_[3][0],
                           pos3D_[2][0]/pos3D_[3][0]])
@@ -132,12 +126,13 @@ class OrbMark():
             pts_L = kp_L[m.queryIdx].pt
             pts_R = kp_R[m.trainIdx].pt
             # ***  Creo il landmark
-            lm = OrbMark(t=i_frame,
-                         l_x=pts_L[0], l_y=pts_L[1],
-                         r_x=pts_R[0], r_y=pts_R[1],
-                         l_desc=desc_L[m.queryIdx],
-                         r_desc=desc_R[m.trainIdx]
-                         )
+            lm = OrbMark(
+                t=i_frame,
+                l_x=pts_L[0], l_y=pts_L[1],
+                r_x=pts_R[0], r_y=pts_R[1],
+                l_desc=desc_L[m.queryIdx],
+                r_desc=desc_R[m.trainIdx]
+                )
             # *** E lo pongo nella lista lms
             if abs(lm.delta_x) > MAX_DISPARITY:
                 continue  # butta il lm
@@ -291,8 +286,10 @@ class OrbMark():
 class Kitti:
     
     def __init__(self):
-        # base_dir_out = '/home/fgr81/Desktop/cantiere_EKF_AUS_py'
         basedir = '/home/fgr81/kitti'
+        #date = '2011_09_26'
+        #drive = '0022'
+        base_dir_out = '/home/fgr81/Desktop/cantiere_EKF_AUS_py'
         date = '2011_10_03'
         drive = '0027'
         data = pykitti.raw(basedir, date, drive, frames = range(0, 20, 1), imformat = 'cv2')
@@ -336,7 +333,7 @@ class Kitti:
         window = sg.Window("Demo", layout)
         return window
     
-    def update_gui(self, index, window):
+    def update_gui(self, index, window, v, g):
         f = str(index).zfill(10) + '.png'
         img_00 = cv2.imread(self.sx_path + '/' + f, cv2.IMREAD_GRAYSCALE)
         img_01 = cv2.imread(self.dx_path + '/' + f, cv2.IMREAD_GRAYSCALE)
@@ -353,16 +350,19 @@ class Kitti:
         img_11 = cv2.imread("plot.png", cv2.IMREAD_GRAYSCALE)
         canvas[img_h:img_h * 2, img_w:img_w * 2] = img_11
         canvas = cv2.cvtColor(canvas, cv2.COLOR_GRAY2RGB)
-        d_idx = 0
+        #d_idx = 0
+        oms_file = open(f"oms_{index}.txt",'w')
         for om in self.gui_lm_track:
+            oms_file.write(f"{om['idd']} {om['distanza']} {om['om'].left['x']} {om['om'].left['y']} {om['om'].right['x']} {om['om'].right['y']} {om['om_p'].left['x']} {om['om_p'].left['y']} {om['om_p'].right['x']} {om['om_p'].right['y']} \n")
             cv2.line(canvas,
                       (int(om['om'].left['x']), int(om['om'].left['y'])),
                       (int(img_w + om['om'].right['x']), int(om['om'].right['y'])),
                       (0, 255, 0),
                       1)
-            if d_idx < 1:                
+            '''if d_idx < 3:                
                 d_idx += 1
-                d_text = f"{om['distanza_x']}, {om['distanza_y']}"
+                #d_text = f"{om['distanza_x']}, {om['distanza_y']}"
+                d_text = "{:.2f}".format(om['distanza'])
                 font = cv2.FONT_HERSHEY_SIMPLEX
                 org_c = ( int(om['om_p'].left['x']), img_h + int(om['om_p'].left['y']))
                 org =   ( int(om['om_p'].left['x']) + 5, img_h + int(om['om_p'].left['y']))
@@ -374,12 +374,13 @@ class Kitti:
                 radius = 4
                 thickness = 5
                 cv2.circle(canvas, org, radius, color, thickness)
-                
+            '''    
             cv2.line(canvas,
                       (int(om['om'].left['x']), int(om['om'].left['y'])),
                       (int(om['om_p'].left['x']), img_h + int(om['om_p'].left['y'])),
                       (0, 0, 255),
                       1)
+        oms_file.close()
         canvas = cv2.resize(canvas, (img_w, img_h))
         img = Image.fromarray(canvas, 'RGB')
         img.save('tmp.png')
@@ -387,8 +388,7 @@ class Kitti:
         # Aggiorno l'interfaccia
         ###
         window["IMAGE"].update(filename='tmp.png')
-        info = f"Lunghezza della misura:{len(self.gui_lm_track)}"
-        #info = "Ciaooooo"
+        info = f"Lunghezza della misura:{len(self.gui_lm_track)}-- v:{v} g:{g}\n"
         window["info"].update(info)
         window["frame_index"].update(f"frame index:{index}")\
     
@@ -405,24 +405,35 @@ class Kitti:
             # Qui si decide lm.idd
             ###
             _p = lm.make_3d_point(self.orb_parameters)
+            if _p == None:
+                # lm_t.remove(lm)
+                lm.idd = -1
+                continue
             nuovo = 0
-            if len(self.lm_t_prec) > 0 or t > 0 :
+            #if len(self.lm_t_prec) > 0 or t > 0 :
+            if len(self.lm_t_prec) > 0 and t > 0 :
                 _lm_match = lm.match(self.lm_t_prec, self.orb_parameters)
                 if _lm_match is not  None:
                     # Controllo che il match non sia un duplicato
                     duplicato = 0
                     for i in range(0, len(scan),3):
+                        
                         if scan[i] == _lm_match.idd:
                             duplicato = 1
                             break
                     if duplicato == 0:
                         lm.idd = _lm_match.idd
-                        # Per la gui:                        
+                        #if lm.idd == 3054:
+                        #    print('KIKI ----------- guarda sopra come è stato calcolato il punto3d')
+                        # Per la gui:   
+                        _d = math.sqrt( _p['x']**2 + _p['y']**2)
                         self.gui_lm_track.append({
                             'om': lm,
                             'om_p': _lm_match,
-                            'distanza_x': _p['x'],
-                            'distanza_y': _p['y'],
+                            #'distanza_x': _p['x'],
+                            #'distanza_y': _p['y'],
+                            'idd': lm.idd,
+                            'distanza': _d,
                             })
                     else:
                         nuovo = 1
@@ -458,7 +469,7 @@ def main():
         
     model_error = np.ones((2, 1), dtype=float, order='F')   # todo il numero '2' deve arrivare da fuori parametricamente
     model_error.flags.writeable = True
-    model_error[0, 0] = 0.5 # 1.  # (m/s) error in the velocity
+    model_error[0, 0] = 1. # 0.5 # 1.  # (m/s) error in the velocity
     model_error[1, 0] = 45 * math.pi/180.  #       90 * math.pi/360.  # 3 degrees error for the steering angle
     
     ekf = Ekf(n=5, m=6, p=0, ml=4, model_error=model_error, SIGMA_R = 5., GMUNU_ESTIMATE = 1.)
@@ -466,22 +477,98 @@ def main():
     slam = Slam(ekf, car, SIGMA_ESTIMATE = 0.1, SIGMA_STEERING = 0.1)
     kitti = Kitti()
     
-    traiettoria = open(Slam.FILENAME_TRAJECTORY, 'w')
+    #####
+    #
+    #
+    #
+    #####
+    if START > 0:
+        '''  debug 
+          file usato da EKF_AUS_NL.C
+        '''
+        file_start = open('start', 'w')
+        file_start.write(str(START))
+        file_start.close()
+        '''  fine '''
+        
+        # Carico la traiettoria
+        print('Carico la traiettoria fino all istante START ', START)
+        try:
+            traiettoria_f = open(Slam.FILENAME_TRAJECTORY, 'r')
+            traiettoria_lines = traiettoria_f.readlines()
+            tr = []
+            for i in range(START):
+                s = traiettoria_lines[i].split()
+                tr.append({ 'x':float(s[0]),
+                           'y': float(s[1]),
+                           'phi': float(s[2]),
+                           'v': float(s[3]),
+                           'g': float(s[4])})
+            traiettoria = open(Slam.FILENAME_TRAJECTORY, 'w')
+            for i in range(START):
+                traiettoria.write(f"{tr[i]['x']} {tr[i]['y']} {tr[i]['phi']} {tr[i]['v']} {tr[i]['g']}\n")
+            #Ricostruisco lo stato            
+            print('Ricostruisco lo stato all istante di START')
+            storia = open(f'./out/output_{START-1}.dat', 'r')
+            lines = storia.readlines()
+            file_row_x = lines[0].split()
+            file_row_y = lines[1].split()
+            file_row_phi = lines[2].split()
+            file_row_v = lines[3].split()
+            file_row_g = lines[4].split()
+            car.x = float(file_row_x[0])
+            car.y = float(file_row_y[0])
+            car.phi = float(file_row_phi[0])
+            car.v = float(file_row_v[0])
+            car.g = float(file_row_g[0])
+            for i in range(ekf.nc):
+                slam.x_xa[i] = float(file_row_x[i + 1])
+                slam.y_xa[i] = float(file_row_y[i + 1])
+                slam.phi_xa[i] = float(file_row_phi[i + 1])
+                slam.v_xa[i] = float(file_row_v[i + 1])
+                slam.g_xa[i] = float(file_row_g[i + 1])
+            for i in range(5, len(lines)):
+                splitted_line = lines[i].split()
+                slam.lm.append(Lm(idd = int(splitted_line[0]),
+                                  meas_x = float(splitted_line[1]), 
+                                  meas_y = float(splitted_line[2]), 
+                                  abs_x = float(splitted_line[3]), 
+                                  abs_y = float(splitted_line[4]), 
+                                  slam = slam))                                            
+                slam.state_lm_idd.append(int(splitted_line[0]))
+
+        except:
+            print("Eccezione nel ripristino, imposto START=0")
+            START = 0
+                
+    if START == 0:
+        traiettoria = open(Slam.FILENAME_TRAJECTORY, 'w')
+    
     window = kitti.disegna_gui()  # Disegna l'interfaccia
         
     def step(i):
         scan = kitti.get_scan(i)
+        '''
+          fmg 170223
+          salvo su file la misura per scopi di debug
+        
+        file_misura = open(f"measure_{i}.txt", 'w')
+        for kk in range(0,len(scan),3):
+            file_misura.write(f"{scan[kk+1]}\n{scan[kk+2]}\n")
+        file_misura.close()
+        '''  
         slam.iterazione(scan)
         slam.write_output_state_to_file(i)
         traiettoria.write(f"{slam.car.x} {slam.car.y} {slam.car.phi} {slam.car.v} {slam.car.g}\n")
         traiettoria.flush()
-        kitti.update_gui(actual_frame, window)
+        kitti.update_gui(actual_frame, window, slam.car.v, slam.car.g)
         print(f"fine step {i} -- {slam.car.x} {slam.car.y} {slam.car.phi} {slam.car.v} {slam.car.g}\n")
 
 
     # Assimilazione iniziale  ##############################    
     scan = kitti.get_scan(START)                           #
-    slam.initial_assimilation(scan)                        #
+    if START == 0:                                         #
+        slam.initial_assimilation(scan)                    #
     analysis, xa = slam.give_xa_and_analysis()             #
     slam.write_output_state_to_file(START)                 # 
     ########################################################
