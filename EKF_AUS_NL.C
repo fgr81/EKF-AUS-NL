@@ -235,7 +235,7 @@ void EKF_AUS::Assimilate2(Eigen::Ref<Eigen::MatrixXd>& measure, const std::funct
     if (_contatore > contatore){
 	    contatore = _contatore + 2;
     }*/
-    ofstream myfile ("anomalia_" + std::to_string(contatore) + ".txt");
+    /*ofstream myfile ("anomalia_" + std::to_string(contatore) + ".txt");
      if (myfile.is_open())
      {
        for(int count = 0; count < anom.rows(); count ++){
@@ -244,7 +244,7 @@ void EKF_AUS::Assimilate2(Eigen::Ref<Eigen::MatrixXd>& measure, const std::funct
        myfile.close();
      }
      contatore += 1;
-     
+     */
      // fine // 
      
      // cout << "KIKI dentro Assimilate2, ecco anom:" << endl << anom << endl;

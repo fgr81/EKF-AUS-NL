@@ -328,8 +328,11 @@ class Slam:
                     
         
     def iterazione(self, _scan):
-        # non funziona 
-        scan, filtered = self.outlier_filter(_scan)
+        
+        # fmg 310323 scan, filtered = self.outlier_filter(_scan)
+        scan = _scan
+        filtered = []
+        
         print(f"kiki len(no_filtered_scan):{len(_scan)/3} len(scan):{len(scan)/3} len(filtered):{len(filtered)/3}")
         '''
     
@@ -396,7 +399,8 @@ class Slam:
         Nel caso in cui la misura sia nulla, bisogna passare allo step 
         successivo senza fare l'assimilazione
         '''
-        if len(measure) > 0:
+        # if len(measure) > 0:
+        if len(measure) > 6 :
             print("Valor medio differenza misura, componente x:", media_spost['x']/media_spost['cont'], " componente y:", media_spost['y']/media_spost['cont'])
             _analysis, _xa = self.ekf.worker(analysis, xa, measure, Slam.evolve, self.non_lin_h)        
             self.update(_analysis, _xa)
@@ -423,7 +427,7 @@ class Slam:
 
         '''
         Elimino dalla memoria i lm vecchi in modo che il tempo di esecuzione sia
-        pressochè costante
+        p ressochè costante
         '''        
         self.alleggerisci_lms()
 

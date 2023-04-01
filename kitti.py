@@ -309,10 +309,11 @@ class Kitti:
             'sx_path': self.sx_path,
             'dx_path': self.dx_path,
             'q': q,
-            'np': 150,  # numero di OrbMark per frame
+            #'np': 150,  # numero di OrbMark per frame
+            'np': 200,  # numero di OrbMark per frame
             'max_disparity': 100,
-            'threshold_spazio': 75.0,
-            'threshold_matcher': 30.0
+            'threshold_spazio': 100.,  # 75.0,
+            'threshold_matcher': 50.  # 30.0
             }
         self.lm_t_prec = []
         self.gui_lm_track = []
@@ -464,7 +465,7 @@ class Kitti:
     
 def main():
     
-    START = 0
+    START = 00
     STOP = 4500
         
     model_error = np.ones((2, 1), dtype=float, order='F')   # todo il numero '2' deve arrivare da fuori parametricamente
