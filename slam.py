@@ -326,12 +326,98 @@ class Slam:
                 out.append(i)
         return out, filtered
                     
+    
+    def outlier_filter2(self, scan):
+        ''' Filtro scan per togliere outlier, cioè che generano anomalia eccezionale.'''
+        out = []
+        filtered = []
+        coeff = 15.  # default 1.5
         
+        analysis, xa = self.give_xa_and_analysis()  # mi torneranno utili per il calcolo dell'anom
+    
+        # Simulo l'ingest dello scan (prima di uscire dovrò rimettere tutto a posto...)
+        appoggio_state_lm_idd = self.state_lm_idd
+        appoggio_state_lm_idd_prec = self.state_lm_idd_prec
+        self.state_lm_idd_prec = self.state_lm_idd  
+        
+        self.state_lm_idd = []
+        self.tracking_lm_idd = []
+        meas = []
+        for ii in range(int(len(scan)/3)):
+            _id = scan[ii*3]
+            self.state_lm_idd.append(_id)
+            if _id in self.state_lm_idd_prec:  # è in tracking
+                self.tracking_lm_idd.append(_id)    
+                meas.append(scan[ii*3 + 1])
+                meas.append(scan[ii*3 + 2])
+        # fine ingest dello scan
+        
+        # Calcolo le anomalie, simulando quello che fa EKF_AUS_NL.C: anom = measure - NonLinH(xf) ;
+        anom = meas - self.non_lin_h(analysis)
+
+        ##
+        # Determino i valori limite
+        ##
+        spost_x = []
+        spost_y = []
+        bound_x = 0.
+        bound_y = 0.
+        for i in range(len(anom)):
+            if i % 2 == 1:  # x
+                spost_x.append(abs(anom[i]))
+            else:
+                spost_y.append(abs(anom[i]))
+        if len(spost_x) > 6:
+            spost_x = sorted(spost_x)
+            spost_y = sorted(spost_y)
+            q1_x, q3_x = np.percentile(spost_x, [25, 75])                
+            q1_y, q3_y = np.percentile(spost_y, [25, 75])
+            iqr_x = q3_x - q1_x
+            iqr_y = q3_y - q1_y
+            bound_x = q3_x + (coeff * iqr_x)
+            bound_y = q3_y + (coeff * iqr_y)            
+            ##
+            # Determino gli outlier, marchiandone l'idd a -1
+            ##
+            for ii in range(int(len(scan)/3)):
+                _id = scan[ii*3]
+                # Vedo se è in tracking
+                i = 0
+                trovato = 0
+                for i in range(len(self.tracking_lm_idd)):
+                    if self.tracking_lm_idd[i] == _id:
+                        if anom[i*2] > bound_x or anom[i*2 +1] > bound_y:
+                            # E' un outlier
+                            #print(f"*RIlevato oulier: {spostamento_x}, {spostamento_y}, le soglie sono x[{bound_x}] y[{bound_y}]")                            
+                            filtered.append(scan[ii*3])
+                            filtered.append(scan[ii*3 + 1])
+                            filtered.append(scan[ii*3 + 2])
+                        else:
+                            #print('* Non è outlier!')
+                            out.append(scan[ii*3])
+                            out.append(scan[ii*3 + 1])
+                            out.append(scan[ii*3 + 2])
+                        trovato = 1
+                        break
+                if trovato == 0:
+                    out.append(scan[ii*3])
+                    out.append(scan[ii*3 + 1])
+                    out.append(scan[ii*3 + 2])
+        else:
+            for i in scan:
+                out.append(i)
+    
+        # Rimetto le cose a posto
+        self.state_lm_idd = appoggio_state_lm_idd
+        self.state_lm_idd_prec = appoggio_state_lm_idd_prec
+        self.tracking_lm_idd = []
+        
+        return out, filtered
+        
+    
     def iterazione(self, _scan):
         
-        # fmg 310323 scan, filtered = self.outlier_filter(_scan)
-        scan = _scan
-        filtered = []
+        scan, filtered = self.outlier_filter2(_scan)
         
         print(f"kiki len(no_filtered_scan):{len(_scan)/3} len(scan):{len(scan)/3} len(filtered):{len(filtered)/3}")
         '''
@@ -340,7 +426,7 @@ class Slam:
         ----------
         i : TYPE
             DESCRIPTION.
-        scan : array nella forma:
+        scan : array nella forma:00
             [ idd | posizione_x_relativa | posizione_y_relativa | idd ...ecc..ecc
 
         Returns

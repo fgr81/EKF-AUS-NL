@@ -219,7 +219,7 @@ void EKF_AUS::Assimilate2(Eigen::Ref<Eigen::MatrixXd>& measure, const std::funct
   VectorXd nlh;
   double check_anom;
   try{
-     MatrixXd nn = NonLinH(xf);
+     // MatrixXd nn = NonLinH(xf);
      anom = measure - NonLinH(xf) ;
      /*
        * fmg 170223 Scrivo anom su file per scopi di debug

@@ -309,11 +309,10 @@ class Kitti:
             'sx_path': self.sx_path,
             'dx_path': self.dx_path,
             'q': q,
-            #'np': 150,  # numero di OrbMark per frame
-            'np': 200,  # numero di OrbMark per frame
+            'np': 150,  # numero di OrbMark per frame
             'max_disparity': 100,
-            'threshold_spazio': 100.,  # 75.0,
-            'threshold_matcher': 50.  # 30.0
+            'threshold_spazio': 75.,  # 100.,  # default 75.0,
+            'threshold_matcher': 30.,  # 50.  # default 30.0
             }
         self.lm_t_prec = []
         self.gui_lm_track = []
@@ -352,9 +351,9 @@ class Kitti:
         canvas[img_h:img_h * 2, img_w:img_w * 2] = img_11
         canvas = cv2.cvtColor(canvas, cv2.COLOR_GRAY2RGB)
         #d_idx = 0
-        oms_file = open(f"oms_{index}.txt",'w')
+        #oms_file = open(f"oms_{index}.txt",'w')
         for om in self.gui_lm_track:
-            oms_file.write(f"{om['idd']} {om['distanza']} {om['om'].left['x']} {om['om'].left['y']} {om['om'].right['x']} {om['om'].right['y']} {om['om_p'].left['x']} {om['om_p'].left['y']} {om['om_p'].right['x']} {om['om_p'].right['y']} \n")
+            #oms_file.write(f"{om['idd']} {om['distanza']} {om['om'].left['x']} {om['om'].left['y']} {om['om'].right['x']} {om['om'].right['y']} {om['om_p'].left['x']} {om['om_p'].left['y']} {om['om_p'].right['x']} {om['om_p'].right['y']} \n")
             cv2.line(canvas,
                       (int(om['om'].left['x']), int(om['om'].left['y'])),
                       (int(img_w + om['om'].right['x']), int(om['om'].right['y'])),
@@ -381,7 +380,7 @@ class Kitti:
                       (int(om['om_p'].left['x']), img_h + int(om['om_p'].left['y'])),
                       (0, 0, 255),
                       1)
-        oms_file.close()
+        #oms_file.close()
         canvas = cv2.resize(canvas, (img_w, img_h))
         img = Image.fromarray(canvas, 'RGB')
         img.save('tmp.png')
