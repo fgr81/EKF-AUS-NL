@@ -331,7 +331,7 @@ class Slam:
         ''' Filtro scan per togliere outlier, cioè che generano anomalia eccezionale.'''
         out = []
         filtered = []
-        coeff = 15.  # default 1.5
+        coeff = 20.  # default 1.5
         
         analysis, xa = self.give_xa_and_analysis()  # mi torneranno utili per il calcolo dell'anom
     

@@ -19,6 +19,8 @@ import time
 import os
 from PIL import Image
 import math
+import configparser
+
 from slam import Slam, Car, Lm
 from ekf_aus_utils import EkfAusUtils as Ekf
 
