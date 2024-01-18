@@ -19,7 +19,8 @@ import time
 import os
 from PIL import Image
 import math
-import configparser
+from configobj import ConfigObj
+
 
 from slam import Slam, Car, Lm
 from ekf_aus_utils import EkfAusUtils as Ekf
@@ -53,28 +54,17 @@ class OrbMark():
         x_r = self.right['x']
         y_r = self.right['y']
         disparity = math.sqrt(((x_l - x_r)**2) + ((y_l - y_r)**2))
-        #print('KIKI disparity: ', disparity)
         if disparity < 1:
             print(f"KIKI attenzione !! disparity < 1 !!! x_l:{x_l} x_r:{x_r} y_l:{y_l} y_r:{y_r}")
             #raise ValueError('disparity < 1.')
             return None
         p = np.array([[x_l], [y_r], [disparity], [1.0]])
         pos3D_ = np.dot(q, p)
-        #print('KIKI pos3d_: ', pos3D_[0][0], ' ' ,pos3D_[1][0], ' ' ,pos3D_[2][0], ' ' ,pos3D_[3][0])
-        #if disparity == 0.:
-            #raise ValueError('diparity null')                  
         pos3D = np.array([pos3D_[0][0]/pos3D_[3][0],
                           pos3D_[1][0]/pos3D_[3][0],
                           pos3D_[2][0]/pos3D_[3][0]])
         # todo gestione eccezione dividebyzero
         point = {}
-        # point['x'] = pos3D[0]
-        # point['y'] = pos3D[1]
-        # point['z'] = pos3D[2]
-        
-        #fmg 251222 inverto questi due segni
-        #point['x'] = pos3D[2]
-        #point['y'] = -pos3D[0]
         point['x'] = pos3D[2]
         point['y'] = -pos3D[0]
         return point
@@ -278,22 +268,24 @@ class OrbMark():
             pref = lms_f_prec[sorted_matches[0].trainIdx]
             dist = np.sqrt(np.square(self.left['x'] - pref.left['x']) +
                            np.square(self.left['y'] - pref.left['y']))
-            # print(f"distanza spaziale:{dist}  --
             # distanza match:{sorted_matches[0].distance}")
             if dist < threshold_spazio and sorted_matches[0].distance < threshold_matcher:
-                # print(f"idd del landmark selezionato: {lms_f_prec[sorted_matches[0].trainIdx].idd}")
                 return lms_f_prec[sorted_matches[0].trainIdx]
         return None
 
 class Kitti:
     
-    def __init__(self):
-        basedir = '/home/fgr81/kitti'
-        #date = '2011_09_26'
-        #drive = '0022'
-        base_dir_out = '/home/fgr81/Desktop/cantiere_EKF_AUS_py'
-        date = '2011_10_03'
-        drive = '0027'
+    def __init__(self,
+            basedir = '/home/fgr81/kitti',
+            base_dir_out = '/home/fgr81/Desktop/cantiere_EKF_AUS_py',
+            date = '2011_10_03',
+            drive = '0027',
+            max_orb_points = 150,
+            max_disparity = 100.,
+            threshold_spazio = 75.,
+            threshold_matcher = 30.,
+            ):
+        
         data = pykitti.raw(basedir, date, drive, frames = range(0, 20, 1), imformat = 'cv2')
         self.sx_path = basedir + '/' + date + '/' + date + '_drive_' + drive + '_sync/image_00/data'
         self.dx_path = basedir + '/' + date + '/' + date + '_drive_' + drive + '_sync/image_01/data'
@@ -311,10 +303,10 @@ class Kitti:
             'sx_path': self.sx_path,
             'dx_path': self.dx_path,
             'q': q,
-            'np': 150,  # numero di OrbMark per frame
-            'max_disparity': 100,
-            'threshold_spazio': 75.,  # 100.,  # default 75.0,
-            'threshold_matcher': 30.,  # 50.  # default 30.0
+            'np': max_orb_points,  # 150,  # numero di OrbMark per frame
+            'max_disparity': max_disparity,  # 100,
+            'threshold_spazio': threshold_spazio,  # 75.0,
+            'threshold_matcher': threshold_matcher,  # 30.0
             }
         self.lm_t_prec = []
         self.gui_lm_track = []
@@ -465,19 +457,63 @@ class Kitti:
         
     
 def main():
+    config = ConfigObj("config.ini")
+
+    #START = 00
+    #STOP = 4500
+    START = int(config['KITTI']['start'])
+    STOP = int(config['KITTI']['stop'])
     
-    START = 00
-    STOP = 4500
-        
-    model_error = np.ones((2, 1), dtype=float, order='F')   # todo il numero '2' deve arrivare da fuori parametricamente
+    # ekf = Ekf(n=5, m=6, p=0, ml=4, model_error=model_error, SIGMA_R = 5., GMUNU_ESTIMATE = 1.)
+    param_ekf = config['EKF']
+    _model_error = param_ekf['model_error']
+    #model_error = np.ones((2, 1), dtype=float, order='F')   # todo il numero '2' deve arrivare da fuori parametricamente
+    model_error = np.ones( (len(_model_error),1), dtype=float, order='F')
     model_error.flags.writeable = True
-    model_error[0, 0] = 1. # 0.5 # 1.  # (m/s) error in the velocity
-    model_error[1, 0] = 45 * math.pi/180.  #       90 * math.pi/360.  # 3 degrees error for the steering angle
+    # model_error[0, 0] = 1. # 0.5 # 1.  # (m/s) error in the velocity
+    # model_error[1, 0] = 45 * math.pi/180.  #       90 * math.pi/360.  # 3 degrees error for the steering angle
+    for idx, x in enumerate(_model_error):
+        model_error[idx] = float(x)
+    ekf = Ekf(
+        n = int(param_ekf['n']),
+        m = int(param_ekf['m']),
+        p = 0,
+        ml = int(param_ekf['ml']),
+        model_error = model_error,
+        SIGMA_R = float(param_ekf['sigma_r']),
+        GMUNU_ESTIMATE = float(param_ekf['gmunu_estimate']),
+        )
     
-    ekf = Ekf(n=5, m=6, p=0, ml=4, model_error=model_error, SIGMA_R = 5., GMUNU_ESTIMATE = 1.)
-    car = Car(x = 0., y = 0., phi = 0., v = 10., g = 0.)
-    slam = Slam(ekf, car, SIGMA_ESTIMATE = 0.1, SIGMA_STEERING = 0.1)
-    kitti = Kitti()
+    #car = Car(x = 0., y = 0., phi = 0., v = 10., g = 0.)
+    param_car = config['CAR']
+    car = Car(
+        x = float(param_car['x']),
+        y = float(param_car['y']),
+        phi = float(param_car['phi']),
+        v = float(param_car['v']),
+        g = float(param_car['g']),
+        )
+    
+    #slam = Slam(ekf, car, SIGMA_ESTIMATE = 0.1, SIGMA_STEERING = 0.1, outlier_coeff)
+    param_slam = config['SLAM']
+    slam = Slam(
+            ekf, 
+            car, 
+            SIGMA_ESTIMATE = float(param_slam['lm_sigma_estimate']),
+            SIGMA_STEERING = float(param_slam['lm_sigma_steering']),
+            outlier_coeff = int(param_slam['outlier_coeff']),
+            )
+    
+    kitti = Kitti( 
+            basedir = config['KITTI']['basedir'],
+            base_dir_out = config['KITTI']['base_dir_out'],
+            date = config['KITTI']['date'],
+            drive = config['KITTI']['drive'],
+            max_orb_points = int(config['ORB']['max_orb_points']),
+            max_disparity = float(config['ORB']['max_disparity']),
+            threshold_spazio = float(config['ORB']['threshold_spazio']),
+            threshold_matcher = float(config['ORB']['threshold_matcher']),
+            )
     
     #####
     #

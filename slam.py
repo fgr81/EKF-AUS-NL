@@ -17,7 +17,7 @@ class Slam:
     FILENAME_OUTPUT = 'out/output'
     FILENAME_TRAJECTORY = 'trajectory.dat'  
     
-    def __init__(self, ekf, car, SIGMA_ESTIMATE = 1., SIGMA_STEERING = 0.1):
+    def __init__(self, ekf, car, SIGMA_ESTIMATE = 1., SIGMA_STEERING = 0.1, outlier_coeff = 10.):
         
         self.ekf = ekf
         nc = ekf.nc
@@ -37,7 +37,8 @@ class Slam:
         self.tracking_lm_idd = []
         self.state_lm_idd = []
         self.state_lm_idd_prec = []  # Usato in non_lin_h per identificare nel vettore di stato  xf i lm
-
+        
+        self.outlier_coeff = outlier_coeff
 
 
     def write_output_state_to_file(self, step = 0):
@@ -331,8 +332,10 @@ class Slam:
         ''' Filtro scan per togliere outlier, cioè che generano anomalia eccezionale.'''
         out = []
         filtered = []
-        coeff = 20.  # default 1.5
-        
+
+        # coeff = 40.  # default 1.5
+        coeff = self.outlier_coeff
+
         analysis, xa = self.give_xa_and_analysis()  # mi torneranno utili per il calcolo dell'anom
     
         # Simulo l'ingest dello scan (prima di uscire dovrò rimettere tutto a posto...)
@@ -386,7 +389,8 @@ class Slam:
                 trovato = 0
                 for i in range(len(self.tracking_lm_idd)):
                     if self.tracking_lm_idd[i] == _id:
-                        if anom[i*2] > bound_x or anom[i*2 +1] > bound_y:
+                        # fmg e luigi 050423 if abs(anom[i*2]) > bound_x or abs(anom[i*2 +1]) > bound_y:
+                        if abs(anom[i*2]) > bound_x:
                             # E' un outlier
                             #print(f"*RIlevato oulier: {spostamento_x}, {spostamento_y}, le soglie sono x[{bound_x}] y[{bound_y}]")                            
                             filtered.append(scan[ii*3])
